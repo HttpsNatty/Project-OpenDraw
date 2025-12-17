@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenDraw</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --card: #161a2f;
+      --text: #e6e8f2;
+      --muted: #a0a4c0;
+      --primary: #4096ED;
+      --wa: #25D366;
+      --border: #2a2f55;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1b1f3a 0%, transparent 40%),
+                  radial-gradient(1200px 600px at 110% 10%, #12153a 0%, transparent 40%),
+                  var(--bg);
+      color: var(--text);
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .card {
+      max-width: 860px;
+      margin: auto;
+      background: linear-gradient(180deg, #181c3a 0%, var(--card) 100%);
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 20px 40px rgba(0,0,0,.45);
+      border: 1px solid var(--border);
+    }
+    h1, h2 {
+      text-align: center;
+      letter-spacing: .3px;
+    }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; color: var(--muted); }
+    p { color: var(--muted); }
+    textarea, input {
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      background: #0f1330;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      outline: none;
+    }
+    textarea::placeholder, input::placeholder { color: #6e73a8; }
+    textarea { resize: vertical; min-height: 120px; }
+    textarea:focus, input:focus { border-color: var(--primary); }
+    button {
+      width: 100%;
+      margin-top: 14px;
+      padding: 14px;
+      font-size: 15px;
+      background: linear-gradient(135deg, #5aa2ff, var(--primary));
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(64,150,237,.35);
+    }
+    button:hover { filter: brightness(1.05); }
+    .hidden { display: none; }
+    .list-item {
+      display: grid;
+      grid-template-columns: 1fr 150px;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .list-item input { cursor: pointer; }
+    .wa {
+      background: linear-gradient(135deg, #3de37a, var(--wa));
+      box-shadow: 0 8px 20px rgba(37,211,102,.35);
+    }
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+    #viewer h1 {
+      font-size: 34px;
+      margin-top: 10px;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎁 Amigo Oculto</h1>
+
+    <!-- ADMIN -->
+    <div id="admin">
+      <p><strong>Passo 1 – Nomes e telefones</strong></p>
+      <p class="hint">Formato: Nome | Telefone (com DDD)<br>Ex: Ana | 11999999999</p>
+      <textarea id="names" rows="6" placeholder="Ana | 11999999999
+Bruno | 21988888888
+Carlos | 31977777777"></textarea>
+      <button onclick="generate()">Gerar sorteio</button>
+    </div>
+
+    <!-- LINKS PARA MODERADORA -->
+    <div id="links" class="hidden">
+      <h2>Enviar para os participantes</h2>
+      <p class="hint">Clique no link para copiar ou use o botão do WhatsApp</p>
+      <div id="list"></div>
+    </div>
+
+    <!-- VIEWER -->
+    <div id="viewer" class="hidden">
+      <h2 id="viewerName"></h2>
+      <p>🎯 Você tirou:</p>
+      <h1 id="viewerResult"></h1>
+    </div>
+  </div>
+
+<script>
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+function generate() {
+  const lines = document.getElementById('names').value
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const people = lines.map(line => {
+    const [name, phone] = line.split('|').map(v => v.trim());
+    return { name, phone };
+  });
+
+  if (people.length < 3 || people.some(p => !p.name || !p.phone)) {
+    alert('Preencha corretamente pelo menos 3 participantes');
+    return;
+  }
+
+  const names = people.map(p => p.name);
+
+  let shuffled = [...names];
+  do {
+    shuffle(shuffled);
+  } while (names.some((n, i) => n === shuffled[i]));
+
+  const pairs = {};
+  names.forEach((n, i) => pairs[n] = shuffled[i]);
+
+  const data = btoa(JSON.stringify(pairs));
+
+  document.getElementById('admin').classList.add('hidden');
+  document.getElementById('links').classList.remove('hidden');
+
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+
+  people.forEach(p => {
+    const url = `${location.origin}${location.pathname}?u=${encodeURIComponent(p.name)}&d=${data}`;
+
+    const msg = `Oi, ${p.name}! \n\nSeu amigo oculto já foi sorteado.\nClique no link para ver quem você tirou:\n ${url}`;
+    const wa = `https://wa.me/55${p.phone}?text=${encodeURIComponent(msg)}`;
+
+    const div = document.createElement('div');
+    div.className = 'list-item';
+
+    const input = document.createElement('input');
+    input.value = url;
+    input.onclick = () => input.select();
+
+    const btn = document.createElement('button');
+    btn.className = 'wa';
+    btn.innerText = 'WhatsApp';
+    btn.onclick = () => window.open(wa, '_blank');
+
+    div.appendChild(input);
+    div.appendChild(btn);
+    list.appendChild(div);
+  });
+}
+
+function loadViewer() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('u') || !params.has('d')) return;
+
+  const user = params.get('u');
+  const data = JSON.parse(atob(params.get('d')));
+
+  document.getElementById('viewerName').innerText = `Olá, ${user}!`;
+  document.getElementById('viewerResult').innerText = data[user];
+
+  document.getElementById('admin').classList.add('hidden');
+  document.getElementById('viewer').classList.remove('hidden');
+}
+
+loadViewer();
+</script>
+</body>
+</html>
