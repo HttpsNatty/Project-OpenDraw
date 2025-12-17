@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Amigo Oculto – Vanilla</title>
+  <title>OpenDraw</title>
   <style>
     :root {
       --bg: #0f1220;
@@ -97,11 +97,11 @@
 
     <!-- ADMIN -->
     <div id="admin">
-      <p><strong>Passo 1 – Nomes e telefones</strong></p>
-      <p class="hint">Formato: Nome | Telefone (com DDD)<br>Ex: Ana | 11999999999</p>
-      <textarea id="names" rows="6" placeholder="Ana | 11999999999
-Bruno | 21988888888
-Carlos | 31977777777"></textarea>
+      <p><strong>Passo 1 – Lista de participantes</strong></p>
+      <p class="hint">Insira os nomes dos participantes, um por linha</p>
+      <textarea id="names" rows="6" placeholder="Ana
+Bruno
+Carlos"></textarea>
       <button onclick="generate()">Gerar sorteio</button>
     </div>
 
@@ -182,13 +182,10 @@ async function generate() {
     .map(l => l.trim())
     .filter(Boolean);
 
-  const people = lines.map(line => {
-    const [name, phone] = line.split('|').map(v => v.trim());
-    return { name, phone };
-  });
+  const people = lines.map(name => ({ name }));
 
-  if (people.length < 3 || people.some(p => !p.name || !p.phone)) {
-    alert('Preencha corretamente pelo menos 3 participantes');
+  if (people.length < 3) {
+    alert('Informe pelo menos 3 participantes');
     return;
   }
 
@@ -212,27 +209,30 @@ async function generate() {
 
     const url = `${location.origin}${location.pathname}?u=${encodeURIComponent(giver.name)}&k=${encrypted}`;
 
-    const msg = `Oi, ${giver.name}!
-
-Seu amigo oculto já foi sorteado.
-Clique no link para ver quem você tirou:
-${url}`;
-    const wa = `https://wa.me/55${giver.phone}?text=${encodeURIComponent(msg)}`;
+    
 
     const div = document.createElement('div');
     div.className = 'list-item';
 
     const input = document.createElement('input');
     input.value = url;
-    input.onclick = () => input.select();
+    input.readOnly = true;
 
-    const btn = document.createElement('button');
-    btn.className = 'wa';
-    btn.innerText = 'WhatsApp';
-    btn.onclick = () => window.open(wa, '_blank');
+    const copy = document.createElement('button');
+    copy.innerText = 'Copiar';
+    copy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        copy.innerText = 'Copiado!';
+        setTimeout(() => copy.innerText = 'Copiar', 1500);
+      } catch {
+        input.select();
+        document.execCommand('copy');
+      }
+    };
 
     div.appendChild(input);
-    div.appendChild(btn);
+    div.appendChild(copy);
     list.appendChild(div);
   }
 }
