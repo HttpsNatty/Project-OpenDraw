@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OpenDraw</title>
+  <title>Amigo Oculto – Vanilla</title>
   <style>
     :root {
       --bg: #0f1220;
@@ -121,6 +121,53 @@ Carlos | 31977777777"></textarea>
   </div>
 
 <script>
+// ===== CRYPTO (AES-GCM) =====
+async function deriveKey(secret) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(secret), { name: 'PBKDF2' }, false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: enc.encode('segredex-salt'),
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encrypt(text, secret) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(secret);
+  const enc = new TextEncoder();
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    enc.encode(text)
+  );
+  const buff = new Uint8Array([...iv, ...new Uint8Array(encrypted)]);
+  return btoa(String.fromCharCode(...buff));
+}
+
+async function decrypt(payload, secret) {
+  const raw = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+  const iv = raw.slice(0, 12);
+  const data = raw.slice(12);
+  const key = await deriveKey(secret);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  );
+  return new TextDecoder().decode(decrypted);
+}
+
+// ===== UTILS =====
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -128,9 +175,10 @@ function shuffle(array) {
   }
 }
 
-function generate() {
+// ===== GENERATE =====
+async function generate() {
   const lines = document.getElementById('names').value
-    .split('\n')
+    .split(/\r?\n/)
     .map(l => l.trim())
     .filter(Boolean);
 
@@ -147,14 +195,7 @@ function generate() {
   const names = people.map(p => p.name);
 
   let shuffled = [...names];
-  do {
-    shuffle(shuffled);
-  } while (names.some((n, i) => n === shuffled[i]));
-
-  const pairs = {};
-  names.forEach((n, i) => pairs[n] = shuffled[i]);
-
-  const data = btoa(JSON.stringify(pairs));
+  do { shuffle(shuffled); } while (names.some((n, i) => n === shuffled[i]));
 
   document.getElementById('admin').classList.add('hidden');
   document.getElementById('links').classList.remove('hidden');
@@ -162,11 +203,21 @@ function generate() {
   const list = document.getElementById('list');
   list.innerHTML = '';
 
-  people.forEach(p => {
-    const url = `${location.origin}${location.pathname}?u=${encodeURIComponent(p.name)}&d=${data}`;
+  for (let i = 0; i < people.length; i++) {
+    const giver = people[i];
+    const receiver = shuffled[i];
 
-    const msg = `Oi, ${p.name}! \n\nSeu amigo oculto já foi sorteado.\nClique no link para ver quem você tirou:\n ${url}`;
-    const wa = `https://wa.me/55${p.phone}?text=${encodeURIComponent(msg)}`;
+    // segredo individual = nome da própria pessoa
+    const encrypted = await encrypt(receiver, giver.name);
+
+    const url = `${location.origin}${location.pathname}?u=${encodeURIComponent(giver.name)}&k=${encrypted}`;
+
+    const msg = `Oi, ${giver.name}!
+
+Seu amigo oculto já foi sorteado.
+Clique no link para ver quem você tirou:
+${url}`;
+    const wa = `https://wa.me/55${giver.phone}?text=${encodeURIComponent(msg)}`;
 
     const div = document.createElement('div');
     div.className = 'list-item';
@@ -183,21 +234,26 @@ function generate() {
     div.appendChild(input);
     div.appendChild(btn);
     list.appendChild(div);
-  });
+  }
 }
 
-function loadViewer() {
+// ===== VIEWER =====
+async function loadViewer() {
   const params = new URLSearchParams(location.search);
-  if (!params.has('u') || !params.has('d')) return;
+  if (!params.has('u') || !params.has('k')) return;
 
   const user = params.get('u');
-  const data = JSON.parse(atob(params.get('d')));
+  const payload = params.get('k');
 
-  document.getElementById('viewerName').innerText = `Olá, ${user}!`;
-  document.getElementById('viewerResult').innerText = data[user];
-
-  document.getElementById('admin').classList.add('hidden');
-  document.getElementById('viewer').classList.remove('hidden');
+  try {
+    const result = await decrypt(payload, user);
+    document.getElementById('viewerName').innerText = `Olá, ${user}!`;
+    document.getElementById('viewerResult').innerText = result;
+    document.getElementById('admin').classList.add('hidden');
+    document.getElementById('viewer').classList.remove('hidden');
+  } catch (e) {
+    alert('Link inválido ou adulterado');
+  }
 }
 
 loadViewer();
