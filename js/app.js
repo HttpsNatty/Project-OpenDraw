@@ -96,7 +96,7 @@ function renderLinkList(results) {
         };
 
         const wa = document.createElement('a');
-        wa.href = `https://wa.me/?text=${encodeURIComponent(`Oii ${giver.name}! 🎁\n\nAbra este link para descobrir seu Amigo Oculto:\n${url}`)}`;
+        wa.href = `https://wa.me/?text=${encodeURIComponent(`Oii ${giver.name}! \n\nAbra este link para descobrir seu Amigo Oculto:\n${url}`)}`;
         wa.target = '_blank';
         wa.className = 'btn wa';
         wa.innerText = 'WhatsApp';
